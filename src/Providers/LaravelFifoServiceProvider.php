@@ -26,7 +26,7 @@ final class LaravelFifoServiceProvider extends ServiceProvider
     public function register(): void
     {
         // You can bind your Fifo class here if needed
-        $this->app->bind('fifo', fn(): \LaravelFifo\Fifo => new \LaravelFifo\Fifo());
+        $this->app->bind('fifo', fn (): \LaravelFifo\Fifo => new \LaravelFifo\Fifo());
         // Register facade alias
         $this->app->alias('fifo', \LaravelFifo\Facades\Fifo::class);
 

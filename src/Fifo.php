@@ -331,17 +331,17 @@ final class Fifo
     {
         // Remove HTML tags and potentially dangerous characters
         $reference = strip_tags($reference);
-        
+
         // Remove or encode special characters that could be used for XSS
         $reference = htmlspecialchars($reference, ENT_QUOTES, 'UTF-8');
-        
+
         // Limit length to prevent buffer overflow attacks
-        $reference = substr($reference, 0, 255);
-        
+        $reference = mb_substr($reference, 0, 255);
+
         // Remove null bytes and control characters
         $reference = preg_replace('/[\x00-\x1F\x7F]/', '', $reference);
-        
-        return trim($reference);
+
+        return mb_trim($reference ?? '');
     }
 
     /**
@@ -377,7 +377,7 @@ final class Fifo
             if (str_contains($e->getMessage(), 'must have a primary key')) {
                 throw $e;
             }
-            throw new Exception("Failed to validate product model '{$productModel}': " . $e->getMessage());
+            throw new Exception("Failed to validate product model '{$productModel}': ".$e->getMessage(), $e->getCode(), $e);
         }
     }
 
@@ -390,22 +390,18 @@ final class Fifo
         if ($value > 99999999.99) {
             return false;
         }
-        
+
         // Check for too many decimal places (prevents precision attacks)
         $decimalString = number_format($value, 10, '.', '');
         $decimals = explode('.', $decimalString)[1] ?? '';
-        $significantDecimals = rtrim($decimals, '0');
-        
-        if (strlen($significantDecimals) > 2) {
+        $significantDecimals = mb_rtrim($decimals, '0');
+
+        if (mb_strlen($significantDecimals) > 2) {
             return false;
         }
-        
+
         // Check for negative infinity, positive infinity, or NaN
-        if (!is_finite($value)) {
-            return false;
-        }
-        
-        return true;
+        return is_finite($value);
     }
 
     /**
@@ -416,8 +412,9 @@ final class Fifo
     private function validateProduct(int $productId): bool
     {
         $this->validateProductModel();
-        
+
         $productModel = config('fifo.product_model');
+
         /** @var class-string<Model> $productModel */
         return $productModel::query()->where('id', $productId)->exists();
     }
