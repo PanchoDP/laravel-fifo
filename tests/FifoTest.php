@@ -89,7 +89,7 @@ describe('getAvailableStock', function (): void {
 describe('fifoPrice', function (): void {
     it('returns stock insufficient for zero stock', function (): void {
         $price = $this->fifo->fifoPrice($this->product->id, 10);
-        expect($price)->toBe('Stock insuficiente');
+        expect($price)->toBe('Insufficient stock');
     });
 
     it('returns 0.00 for zero quantity', function (): void {
@@ -169,9 +169,7 @@ describe('registerOutbound', function (): void {
         $result = $this->fifo->registerOutbound($this->product->id, 100);
 
         expect($result['success'])->toBeFalse()
-            ->and($result['error'])->toContain('Stock insuficiente')
-            ->and($result['error'])->toContain('Disponible: 50')
-            ->and($result['error'])->toContain('Solicitado: 100');
+            ->and($result['error'])->toBe('Insufficient stock available');
     });
 
     it('rejects invalid quantities', function (): void {
@@ -179,7 +177,7 @@ describe('registerOutbound', function (): void {
         $result = $this->fifo->registerOutbound($this->product->id, 0);
 
         expect($result['success'])->toBeFalse()
-            ->and($result['error'])->toBe('Cantidad debe ser mayor a 0');
+            ->and($result['error'])->toBe('Quantity must be greater than zero');
     });
 
     it('calculates complex FIFO pricing correctly', function (): void {

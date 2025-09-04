@@ -31,14 +31,10 @@ final class FifoTransaction extends Model
     /** @use HasFactory<FifoTransactionFactory> */
     use HasFactory;
 
-    protected $fillable = [
-        'product_id',
-        'type',
-        'quantity',
-        'unit_price',
-        'total_amount',
-        'transaction_date',
-        'reference',
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     /** @var array<string, string> */

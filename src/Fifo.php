@@ -26,13 +26,13 @@ final class Fifo
     public function fifoPrice(int $productId, float $quantity): string
     {
         if (! $this->validateProduct($productId)) {
-            return 'Producto no encontrado';
+            return 'Product not found';
         }
 
         $availableStock = $this->getAvailableStock($productId);
 
         if ($quantity > $availableStock) {
-            return 'Stock insuficiente';
+            return 'Insufficient stock';
         }
 
         if ($quantity <= 0) {
@@ -134,6 +134,16 @@ final class Fifo
             return false;
         }
 
+        // Validate decimal precision to prevent overflow attacks
+        if (! $this->validateDecimalPrecision($quantity) || ! $this->validateDecimalPrecision($unitPrice)) {
+            return false;
+        }
+
+        // Sanitize reference field
+        if ($reference !== null) {
+            $reference = $this->sanitizeReference($reference);
+        }
+
         try {
             FifoTransaction::query()->create([
                 'product_id' => $productId,
@@ -177,21 +187,31 @@ final class Fifo
     public function registerOutbound(int $productId, float $quantity, ?string $reference = null): array
     {
         if (! $this->validateProduct($productId)) {
-            return ['success' => false, 'error' => 'Producto no encontrado'];
+            return ['success' => false, 'error' => 'Product not found'];
         }
 
         if ($quantity <= 0) {
-            return ['success' => false, 'error' => 'Cantidad debe ser mayor a 0'];
+            return ['success' => false, 'error' => 'Quantity must be greater than zero'];
+        }
+
+        // Validate decimal precision to prevent overflow attacks
+        if (! $this->validateDecimalPrecision($quantity)) {
+            return ['success' => false, 'error' => 'Invalid quantity precision'];
         }
 
         $availableStock = $this->getAvailableStock($productId);
         if ($quantity > $availableStock) {
-            return ['success' => false, 'error' => "Stock insuficiente. Disponible: {$availableStock}, Solicitado: {$quantity}"];
+            return ['success' => false, 'error' => 'Insufficient stock available'];
         }
 
         $fifoPrice = $this->fifoPrice($productId, $quantity);
-        if ($fifoPrice === 'Stock insuficiente') {
-            return ['success' => false, 'error' => 'Error calculando precio FIFO'];
+        if ($fifoPrice === 'Insufficient stock') {
+            return ['success' => false, 'error' => 'Error calculating FIFO price'];
+        }
+
+        // Sanitize reference field
+        if ($reference !== null) {
+            $reference = $this->sanitizeReference($reference);
         }
 
         try {
@@ -222,7 +242,7 @@ final class Fifo
     public function deleteProduct(int $productId): array
     {
         if (! $this->validateProduct($productId)) {
-            return ['success' => false, 'error' => 'Producto no encontrado'];
+            return ['success' => false, 'error' => 'Product not found'];
         }
 
         // Check if product has transactions
@@ -231,7 +251,7 @@ final class Fifo
         if ($transactionCount > 0) {
             return [
                 'success' => false,
-                'error' => "No se puede eliminar el producto. Tiene {$transactionCount} transacciones asociadas",
+                'error' => 'Cannot delete product with existing transactions',
             ];
         }
 
@@ -262,7 +282,7 @@ final class Fifo
     public function forceDeleteProduct(int $productId): array
     {
         if (! $this->validateProduct($productId)) {
-            return ['success' => false, 'error' => 'Producto no encontrado'];
+            return ['success' => false, 'error' => 'Product not found'];
         }
 
         try {
@@ -305,18 +325,99 @@ final class Fifo
     }
 
     /**
+     * Sanitize reference field to prevent XSS and other attacks.
+     */
+    private function sanitizeReference(string $reference): string
+    {
+        // Remove HTML tags and potentially dangerous characters
+        $reference = strip_tags($reference);
+        
+        // Remove or encode special characters that could be used for XSS
+        $reference = htmlspecialchars($reference, ENT_QUOTES, 'UTF-8');
+        
+        // Limit length to prevent buffer overflow attacks
+        $reference = substr($reference, 0, 255);
+        
+        // Remove null bytes and control characters
+        $reference = preg_replace('/[\x00-\x1F\x7F]/', '', $reference);
+        
+        return trim($reference);
+    }
+
+    /**
+     * Validate the product model configuration.
+     *
+     * @throws Exception
+     */
+    private function validateProductModel(): void
+    {
+        $productModel = config('fifo.product_model');
+
+        if (! $productModel || ! is_string($productModel)) {
+            throw new Exception('Product model not configured properly. Please set FIFO_PRODUCT_MODEL environment variable.');
+        }
+
+        if (! class_exists($productModel)) {
+            throw new Exception("Product model class '{$productModel}' does not exist.");
+        }
+
+        // Ensure the model extends Laravel's Model class
+        if (! is_subclass_of($productModel, Model::class)) {
+            throw new Exception("Product model '{$productModel}' must extend Illuminate\\Database\\Eloquent\\Model.");
+        }
+
+        // Check if the model has the required 'id' column by trying to instantiate it
+        try {
+            /** @var class-string<Model> $productModel */
+            $modelInstance = new $productModel();
+            if (! $modelInstance->getKeyName()) {
+                throw new Exception("Product model '{$productModel}' must have a primary key defined.");
+            }
+        } catch (Exception $e) {
+            if (str_contains($e->getMessage(), 'must have a primary key')) {
+                throw $e;
+            }
+            throw new Exception("Failed to validate product model '{$productModel}': " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Validate decimal precision to prevent overflow attacks.
+     */
+    private function validateDecimalPrecision(float $value): bool
+    {
+        // Check for reasonable decimal precision (max 10 digits, 2 decimal places)
+        if ($value > 99999999.99) {
+            return false;
+        }
+        
+        // Check for too many decimal places (prevents precision attacks)
+        $decimalString = number_format($value, 10, '.', '');
+        $decimals = explode('.', $decimalString)[1] ?? '';
+        $significantDecimals = rtrim($decimals, '0');
+        
+        if (strlen($significantDecimals) > 2) {
+            return false;
+        }
+        
+        // Check for negative infinity, positive infinity, or NaN
+        if (!is_finite($value)) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
      * Validate if the product exists in the configured product model.
      *
      * @throws Exception
      */
     private function validateProduct(int $productId): bool
     {
+        $this->validateProductModel();
+        
         $productModel = config('fifo.product_model');
-
-        if (! $productModel || ! is_string($productModel) || ! class_exists($productModel)) {
-            throw new Exception('Product model not configured properly. Please set FIFO_PRODUCT_MODEL environment variable.');
-        }
-
         /** @var class-string<Model> $productModel */
         return $productModel::query()->where('id', $productId)->exists();
     }
