@@ -2,5 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-09-04
+
+### 🚀 Features
+
+- Improve security Validations and error messages
+
+### 🏗️ Build
+
+- Add Changelog first version
+
 ## [0.1.0] - 2025-09-04
 
