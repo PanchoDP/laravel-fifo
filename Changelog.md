@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2025-09-04
+
+### 🎨 Styling
+
+- Solve problems of phpstan and rector
+
 ## [0.2.0] - 2025-09-04
 
 ### 🚀 Features
