@@ -14,6 +14,9 @@
 
 Laravel package for inventory management using FIFO (First In, First Out) methodology.
 
+> [!IMPORTANT]
+> Caution: This package is a work in progress and may not be production-ready. Use at your own risk.
+
 ## What is FIFO?
 
 FIFO (First In, First Out) is an inventory valuation method where the first items purchased are the first items sold. This method is essential for:
