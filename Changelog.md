@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.3] - 2025-09-24
+
+### 🐛 Bug Fixes
+
+- Fix instalation and migrations automatic name
+
 ## [0.2.2] - 2025-09-04
 
 ### 📚 Documentation
