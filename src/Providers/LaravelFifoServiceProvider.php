@@ -10,12 +10,6 @@ final class LaravelFifoServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
-
-        $this->publishes([
-            __DIR__.'/../../database/migrations/2025-09-01_create_fifo_transactions_table.php' => database_path('migrations/2025-09-01_create_fifo_transactions_table.php'),
-        ], 'laravel-fifo-migrations');
-
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \LaravelFifo\Console\InstallCommand::class,

@@ -34,14 +34,31 @@ final class InstallCommand extends Command
     {
         $this->info('Publishing migrations...');
 
-        $packageMigrations = __DIR__.'/../../database/migrations';
-        $appMigrations = database_path('migrations');
-
         $filesystem = new Filesystem();
+        $sourcePath = __DIR__.'/../../database/migrations/create_fifo_transactions_table.php';
 
-        if ($filesystem->exists($packageMigrations)) {
-            $filesystem->copyDirectory($packageMigrations, $appMigrations);
-            $this->info('✓ Migrations published');
+        // Generate dynamic timestamp
+        $timestamp = date('Y_m_d_His');
+        $migrationName = "{$timestamp}_create_fifo_transactions_table.php";
+        $destinationPath = database_path("migrations/{$migrationName}");
+
+        if (!$filesystem->exists($destinationPath)) {
+            // Check if migration already exists with different timestamp
+            $existingMigrations = glob(database_path('migrations/*_create_fifo_transactions_table.php'));
+
+            if (!empty($existingMigrations) && !$this->option('force')) {
+                $this->warn('! FIFO migration already exists. Use --force to overwrite.');
+                return;
+            }
+
+            if ($filesystem->exists($sourcePath)) {
+                $filesystem->copy($sourcePath, $destinationPath);
+                $this->info("✓ Migration created: {$migrationName}");
+            } else {
+                $this->error('! Source migration file not found');
+            }
+        } else {
+            $this->warn('! Migration already exists with this timestamp');
         }
     }
 
