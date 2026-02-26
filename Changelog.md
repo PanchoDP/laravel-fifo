@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Composer rector process
 
+### 🧪 Testing
+
+- Test for php8.5 added in github actions tests
+
 ## [0.2.3] - 2025-09-24
 
 ### 🐛 Bug Fixes
