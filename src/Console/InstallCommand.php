@@ -42,12 +42,13 @@ final class InstallCommand extends Command
         $migrationName = "{$timestamp}_create_fifo_transactions_table.php";
         $destinationPath = database_path("migrations/{$migrationName}");
 
-        if (!$filesystem->exists($destinationPath)) {
+        if (! $filesystem->exists($destinationPath)) {
             // Check if migration already exists with different timestamp
             $existingMigrations = glob(database_path('migrations/*_create_fifo_transactions_table.php'));
 
-            if (!empty($existingMigrations) && !$this->option('force')) {
+            if ($existingMigrations !== [] && $existingMigrations !== false && ! $this->option('force')) {
                 $this->warn('! FIFO migration already exists. Use --force to overwrite.');
+
                 return;
             }
 
