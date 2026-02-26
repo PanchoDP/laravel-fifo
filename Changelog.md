@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.4] - 2026-02-26
+
+### 🏗️ Build
+
+- Composer rector process
+
 ## [0.2.3] - 2025-09-24
 
 ### 🐛 Bug Fixes
