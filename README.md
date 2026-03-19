@@ -8,7 +8,13 @@
 <a href="https://github.com/PanchoDP/laravel-fifo/actions/workflows/tests.yml"><img src="https://github.com/PanchoDP/laravel-fifo/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
 </p>
 
+## Compatibility
 
+| Laravel | PHP   | Supported |
+|---------|-------|-----------|
+| 11.x    | 8.4 / 8.5 | ✓ |
+| 12.x    | 8.4 / 8.5 | ✓ |
+| 13.x    | 8.4 / 8.5 | ✓ |
 
 # Laravel Fifo
 
