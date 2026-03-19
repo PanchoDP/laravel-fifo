@@ -9,12 +9,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     strategy:
+      fail-fast: false
       matrix:
         php-version: [8.4, 8.5]
+        laravel-version: [11, 12, 13]
+        include:
+          - laravel-version: 11
+            testbench: ^9.0
+          - laravel-version: 12
+            testbench: ^10.0
+          - laravel-version: 13
+            testbench: ^11.0
 
-    name: PHP ${{ matrix.php-version }}
+    name: PHP ${{ matrix.php-version }} / Laravel ${{ matrix.laravel-version }}
 
     steps:
     - name: Checkout code
@@ -27,17 +36,11 @@ jobs:
         extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite
         coverage: none
 
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v3
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-${{ matrix.php-version }}-
+    - name: Require specific testbench version
+      run: composer require "orchestra/testbench:${{ matrix.testbench }}" --no-update --dev
 
     - name: Install dependencies
-      run: composer install --prefer-dist --no-progress
+      run: composer update --prefer-dist --no-progress
 
     - name: Run tests
       run: composer test
