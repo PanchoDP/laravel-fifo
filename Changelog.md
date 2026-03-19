@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.5] - 2026-03-19
+
+### 📚 Documentation
+
+- Update readme compatibility information
+
+### 🧪 Testing
+
+- Check laravel 13 compatibility
+
 ## [0.2.4] - 2026-02-26
 
 ### 🏗️ Build
