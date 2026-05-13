@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.6] - 2026-05-13
+
+### 🐛 Bug Fixes
+
+- Composer version change
+
 ## [0.2.5] - 2026-03-19
 
 ### 📚 Documentation
