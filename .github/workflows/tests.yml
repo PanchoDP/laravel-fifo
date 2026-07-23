@@ -14,10 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         php-version: [8.4, 8.5]
-        laravel-version: [11, 12, 13]
+        laravel-version: [12, 13]
         include:
-          - laravel-version: 11
-            testbench: ^9.0
           - laravel-version: 12
             testbench: ^10.0
           - laravel-version: 13

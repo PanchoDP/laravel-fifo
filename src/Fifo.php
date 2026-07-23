@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use LaravelFifo\Models\FifoTransaction;
-use phpDocumentor\Reflection\DocBlock\Tags\Throws;
 
 final class Fifo
 {
