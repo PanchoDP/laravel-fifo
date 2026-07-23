@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use LaravelFifo\Fifo;
 use LaravelFifo\Models\FifoTransaction;
 use LaravelFifo\Test\Models\Product;
@@ -259,4 +260,53 @@ describe('getCurrentInventoryValue', function (): void {
         expect($value)->toBe(600.0);
     });
 
+});
+
+describe('concurrency and determinism', function (): void {
+    it('locks the product row during outbound to prevent overselling', function (): void {
+        $this->fifo->registerInbound($this->product->id, 100, 10.00);
+
+        DB::enableQueryLog();
+        $result = $this->fifo->registerOutbound($this->product->id, 30);
+
+        // El check de stock y el insert corren en una transacción con lock
+        // pesimista sobre la fila del producto (SELECT ... FOR UPDATE). El driver
+        // de test omite el FOR UPDATE, pero el SELECT sobre products debe ocurrir.
+        $productLocks = collect(DB::getQueryLog())
+            ->filter(fn (array $query): bool => str_contains($query['query'], 'from "products"'));
+
+        expect($result['success'])->toBeTrue()
+            ->and($productLocks)->not->toBeEmpty();
+    });
+
+    it('still rejects outbound when there is insufficient stock', function (): void {
+        $this->fifo->registerInbound($this->product->id, 50, 15.00);
+
+        $result = $this->fifo->registerOutbound($this->product->id, 80);
+
+        expect($result['success'])->toBeFalse()
+            ->and($result['error'])->toBe('Insufficient stock available')
+            ->and(FifoTransaction::query()->where('type', 'out')->count())->toBe(0);
+    });
+
+    it('consumes batches deterministically when transaction dates tie', function (): void {
+        $tiedDate = now();
+
+        // Dos lotes con la MISMA fecha; el desempate por id garantiza FIFO estable.
+        FifoTransaction::factory()->forProduct($this->product)->inbound()->create([
+            'transaction_date' => $tiedDate,
+            'quantity' => 100,
+            'unit_price' => 10.00,
+            'total_amount' => 1000.00,
+        ]);
+        FifoTransaction::factory()->forProduct($this->product)->inbound()->create([
+            'transaction_date' => $tiedDate,
+            'quantity' => 100,
+            'unit_price' => 20.00,
+            'total_amount' => 2000.00,
+        ]);
+
+        // Las primeras 100 unidades salen del lote más antiguo por id (precio 10.00).
+        expect($this->fifo->fifoPrice($this->product->id, 100))->toBe('10.00');
+    });
 });

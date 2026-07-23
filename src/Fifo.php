@@ -7,6 +7,7 @@ namespace LaravelFifo;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use LaravelFifo\Models\FifoTransaction;
 use phpDocumentor\Reflection\DocBlock\Tags\Throws;
 
@@ -86,12 +87,14 @@ final class Fifo
         $inboundTransactions = FifoTransaction::query()->where('product_id', $productId)
             ->where('type', 'in')
             ->orderBy('transaction_date')
+            ->orderBy('id')
             ->get();
 
         /** @var Collection<int, FifoTransaction> $outboundTransactions */
         $outboundTransactions = FifoTransaction::query()->where('product_id', $productId)
             ->where('type', 'out')
             ->orderBy('transaction_date')
+            ->orderBy('id')
             ->get();
 
         $stockByBatch = [];
@@ -199,22 +202,34 @@ final class Fifo
             return ['success' => false, 'error' => 'Invalid quantity precision'];
         }
 
-        $availableStock = $this->getAvailableStock($productId);
-        if ($quantity > $availableStock) {
-            return ['success' => false, 'error' => 'Insufficient stock available'];
-        }
-
-        $fifoPrice = $this->fifoPrice($productId, $quantity);
-        if ($fifoPrice === 'Insufficient stock') {
-            return ['success' => false, 'error' => 'Error calculating FIFO price'];
-        }
-
         // Sanitize reference field
         if ($reference !== null) {
             $reference = $this->sanitizeReference($reference);
         }
 
+        // The availability check and the transaction insert run inside a database
+        // transaction with a pessimistic lock on the product row, so concurrent
+        // outbound operations for the same product are serialized and cannot
+        // oversell (drive the stock below zero).
+        DB::beginTransaction();
+
         try {
+            $this->lockProduct($productId);
+
+            $availableStock = $this->getAvailableStock($productId);
+            if ($quantity > $availableStock) {
+                DB::rollBack();
+
+                return ['success' => false, 'error' => 'Insufficient stock available'];
+            }
+
+            $fifoPrice = $this->fifoPrice($productId, $quantity);
+            if ($fifoPrice === 'Insufficient stock') {
+                DB::rollBack();
+
+                return ['success' => false, 'error' => 'Error calculating FIFO price'];
+            }
+
             /** @var FifoTransaction $transaction */
             $transaction = FifoTransaction::query()->create([
                 'product_id' => $productId,
@@ -226,8 +241,12 @@ final class Fifo
                 'reference' => $reference ?? 'OUT-'.time(),
             ]);
 
+            DB::commit();
+
             return ['success' => true, 'transaction_id' => $transaction->id, 'fifo_price' => $fifoPrice];
         } catch (Exception $e) {
+            DB::rollBack();
+
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -319,9 +338,23 @@ final class Fifo
         /** @var Collection<int, FifoTransaction> $transactions */
         $transactions = FifoTransaction::query()->where('product_id', $productId)
             ->orderBy('transaction_date')
+            ->orderBy('id')
             ->get();
 
         return $transactions;
+    }
+
+    /**
+     * Acquire a pessimistic lock on the product row to serialize stock mutations.
+     */
+    private function lockProduct(int $productId): void
+    {
+        $productModel = config('fifo.product_model');
+
+        if (is_string($productModel) && class_exists($productModel)) {
+            /** @var class-string<Model> $productModel */
+            $productModel::query()->whereKey($productId)->lockForUpdate()->first();
+        }
     }
 
     /**
