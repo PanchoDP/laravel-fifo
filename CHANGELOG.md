@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-07-23
+
+### 🚀 Features
+
+- Add structured priceFor(), harden registerOutbound and stabilize FIFO ordering
+
+### 🐛 Bug Fixes
+
+- Prevent overselling in registerOutbound and make FIFO order deterministic
+
 ## [0.2.6] - 2026-05-13
 
 ### 🐛 Bug Fixes
