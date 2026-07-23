@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-07-23
+
+### 🐛 Bug Fixes
+
+- Remove Laravel 11 from test matrix (security EOL)
+
 ## [0.3.1] - 2026-07-23
 
 ### 📚 Documentation
