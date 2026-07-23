@@ -262,9 +262,13 @@ use LaravelFifo\Facades\Fifo;
 $stock = Fifo::getAvailableStock(1);
 echo "Available stock: {$stock}";
 
-// Get FIFO price for specific quantity
-$price = Fifo::fifoPrice(1, 25.0);
-echo "FIFO price for 25 units: ${price}";
+// Get FIFO price for a specific quantity (recommended)
+$result = Fifo::priceFor(1, 25.0);
+if ($result['success']) {
+    echo "FIFO price for 25 units: {$result['price']}"; // e.g. 10.33
+} else {
+    echo "Error: {$result['error']}"; // 'Product not found' or 'Insufficient stock'
+}
 
 // Get current inventory value
 $value = Fifo::getCurrentInventoryValue(1);
@@ -276,6 +280,33 @@ foreach ($batches as $batch) {
     echo "Batch {$batch['transaction_id']}: {$batch['available_quantity']} units at ${batch['unit_price']}";
 }
 ```
+
+### Calculating the FIFO Price with priceFor()
+
+Use `priceFor()` to obtain the FIFO unit price for a given quantity. It returns a
+structured result so you can distinguish a valid price from an error without
+parsing strings:
+
+```php
+use LaravelFifo\Facades\Fifo;
+
+$result = Fifo::priceFor(1, 25.0);
+
+// On success:
+// ['success' => true, 'price' => 10.33]
+//
+// On failure:
+// ['success' => false, 'error' => 'Product not found']
+// ['success' => false, 'error' => 'Insufficient stock']
+```
+
+Requesting a quantity of `0` (or less) returns `['success' => true, 'price' => 0.0]`.
+
+> [!WARNING]
+> `fifoPrice()` is **deprecated since 0.3.0** and will be removed in 1.0.0. It
+> returns a string that mixes error messages (`'Product not found'`,
+> `'Insufficient stock'`) with numeric values, which is error-prone. Use
+> `priceFor()` instead.
 
 ### Understanding calculateStockByBatch() Return Value
 
