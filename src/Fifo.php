@@ -20,24 +20,29 @@ final class Fifo
     public int $productId;
 
     /**
-     * Calculate the FIFO price for a given product and quantity.
+     * Calculate the FIFO unit price for a given product and quantity.
+     *
+     * Returns a structured result so callers can distinguish a valid price
+     * from an error without parsing strings:
+     *  - ['success' => true, 'price' => float]   on success
+     *  - ['success' => false, 'error' => string] on failure
+     *
+     * @return array{success: bool, price?: float, error?: string}
      *
      * @throws Exception
      */
-    public function fifoPrice(int $productId, float $quantity): string
+    public function priceFor(int $productId, float $quantity): array
     {
         if (! $this->validateProduct($productId)) {
-            return 'Product not found';
-        }
-
-        $availableStock = $this->getAvailableStock($productId);
-
-        if ($quantity > $availableStock) {
-            return 'Insufficient stock';
+            return ['success' => false, 'error' => 'Product not found'];
         }
 
         if ($quantity <= 0) {
-            return '0.00';
+            return ['success' => true, 'price' => 0.0];
+        }
+
+        if ($quantity > $this->getAvailableStock($productId)) {
+            return ['success' => false, 'error' => 'Insufficient stock'];
         }
 
         $stockByBatch = $this->calculateStockByBatch($productId);
@@ -55,7 +60,28 @@ final class Fifo
             $remainingQuantity -= $usedQuantity;
         }
 
-        return number_format($totalCost / $quantity, 2);
+        return ['success' => true, 'price' => round($totalCost / $quantity, 2)];
+    }
+
+    /**
+     * Calculate the FIFO price for a given product and quantity.
+     *
+     * @deprecated 0.3.0 Use priceFor() instead; it returns a structured result
+     *             that distinguishes errors from a valid price. This method mixes
+     *             error strings ('Product not found', 'Insufficient stock') with
+     *             numeric strings and will be removed in 1.0.0.
+     *
+     * @throws Exception
+     */
+    public function fifoPrice(int $productId, float $quantity): string
+    {
+        $result = $this->priceFor($productId, $quantity);
+
+        if ($result['success'] === false) {
+            return $result['error'] ?? 'Unknown error';
+        }
+
+        return number_format($result['price'] ?? 0.0, 2);
     }
 
     /**
@@ -223,27 +249,29 @@ final class Fifo
                 return ['success' => false, 'error' => 'Insufficient stock available'];
             }
 
-            $fifoPrice = $this->fifoPrice($productId, $quantity);
-            if ($fifoPrice === 'Insufficient stock') {
+            $priceResult = $this->priceFor($productId, $quantity);
+            if ($priceResult['success'] === false) {
                 DB::rollBack();
 
                 return ['success' => false, 'error' => 'Error calculating FIFO price'];
             }
+
+            $fifoPrice = $priceResult['price'] ?? 0.0;
 
             /** @var FifoTransaction $transaction */
             $transaction = FifoTransaction::query()->create([
                 'product_id' => $productId,
                 'type' => 'out',
                 'quantity' => $quantity,
-                'unit_price' => (float) $fifoPrice,
-                'total_amount' => $quantity * (float) $fifoPrice,
+                'unit_price' => $fifoPrice,
+                'total_amount' => $quantity * $fifoPrice,
                 'transaction_date' => now(),
                 'reference' => $reference ?? 'OUT-'.time(),
             ]);
 
             DB::commit();
 
-            return ['success' => true, 'transaction_id' => $transaction->id, 'fifo_price' => $fifoPrice];
+            return ['success' => true, 'transaction_id' => $transaction->id, 'fifo_price' => number_format($fifoPrice, 2)];
         } catch (Exception $e) {
             DB::rollBack();
 

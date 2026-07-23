@@ -310,3 +310,63 @@ describe('concurrency and determinism', function (): void {
         expect($this->fifo->fifoPrice($this->product->id, 100))->toBe('10.00');
     });
 });
+
+describe('priceFor', function (): void {
+    it('returns a structured success result with the FIFO price', function (): void {
+        $this->fifo->registerInbound($this->product->id, 100, 15.50);
+
+        $result = $this->fifo->priceFor($this->product->id, 30);
+
+        expect($result['success'])->toBeTrue()
+            ->and($result['price'])->toBe(15.50)
+            ->and($result)->not->toHaveKey('error');
+    });
+
+    it('averages the price across multiple batches', function (): void {
+        $this->fifo->registerInbound($this->product->id, 100, 10.00);
+        $this->fifo->registerInbound($this->product->id, 50, 15.00);
+
+        // 120 unidades: 100 @ 10 + 20 @ 15 = 1300 / 120 = 10.83
+        $result = $this->fifo->priceFor($this->product->id, 120);
+
+        expect($result['success'])->toBeTrue()
+            ->and($result['price'])->toBe(10.83);
+    });
+
+    it('returns a structured error when stock is insufficient', function (): void {
+        $this->fifo->registerInbound($this->product->id, 50, 15.00);
+
+        $result = $this->fifo->priceFor($this->product->id, 100);
+
+        expect($result['success'])->toBeFalse()
+            ->and($result['error'])->toBe('Insufficient stock')
+            ->and($result)->not->toHaveKey('price');
+    });
+
+    it('returns a structured error when the product does not exist', function (): void {
+        $result = $this->fifo->priceFor(999999, 10);
+
+        expect($result['success'])->toBeFalse()
+            ->and($result['error'])->toBe('Product not found');
+    });
+
+    it('returns a zero price for a zero quantity', function (): void {
+        $this->fifo->registerInbound($this->product->id, 100, 15.50);
+
+        $result = $this->fifo->priceFor($this->product->id, 0);
+
+        expect($result['success'])->toBeTrue()
+            ->and($result['price'])->toBe(0.0);
+    });
+});
+
+describe('fifoPrice (deprecated wrapper)', function (): void {
+    it('still returns the legacy string outputs for backward compatibility', function (): void {
+        $this->fifo->registerInbound($this->product->id, 100, 15.50);
+
+        expect($this->fifo->fifoPrice($this->product->id, 30))->toBe('15.50')
+            ->and($this->fifo->fifoPrice($this->product->id, 0))->toBe('0.00')
+            ->and($this->fifo->fifoPrice($this->product->id, 500))->toBe('Insufficient stock')
+            ->and($this->fifo->fifoPrice(999999, 10))->toBe('Product not found');
+    });
+});
